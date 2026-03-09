@@ -1,5 +1,5 @@
 import os
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 from click.testing import CliRunner
@@ -21,22 +21,14 @@ class TestInitCommand:
             assert os.path.isdir("migrations/versions")
             assert os.path.isfile("migrations/env.py")
 
-    def test_init_custom_directory(
-        self, runner, tmp_path
-    ):
+    def test_init_custom_directory(self, runner, tmp_path):
         with runner.isolated_filesystem(temp_dir=tmp_path):
-            result = runner.invoke(
-                cli, ["init", "-d", "my_migrations"]
-            )
+            result = runner.invoke(cli, ["init", "-d", "my_migrations"])
             assert result.exit_code == 0
-            assert os.path.isdir(
-                "my_migrations/versions"
-            )
+            assert os.path.isdir("my_migrations/versions")
             assert os.path.isfile("my_migrations/env.py")
 
-    def test_init_does_not_overwrite(
-        self, runner, tmp_path
-    ):
+    def test_init_does_not_overwrite(self, runner, tmp_path):
         with runner.isolated_filesystem(temp_dir=tmp_path):
             runner.invoke(cli, ["init"])
             result = runner.invoke(cli, ["init"])
@@ -45,9 +37,7 @@ class TestInitCommand:
 
 
 class TestRevisionCommand:
-    def test_revision_creates_file(
-        self, runner, tmp_path
-    ):
+    def test_revision_creates_file(self, runner, tmp_path):
         with runner.isolated_filesystem(temp_dir=tmp_path):
             runner.invoke(cli, ["init"])
             result = runner.invoke(
@@ -59,9 +49,7 @@ class TestRevisionCommand:
 
             versions = os.listdir("migrations/versions")
             migration_files = [
-                f
-                for f in versions
-                if f.endswith(".py") and f != "__init__.py"
+                f for f in versions if f.endswith(".py") and f != "__init__.py"
             ]
             assert len(migration_files) == 1
             assert "create_users" in migration_files[0]
@@ -81,9 +69,7 @@ class TestRevisionCommand:
 
             versions = os.listdir("migrations/versions")
             migration_files = [
-                f
-                for f in versions
-                if f.endswith(".py") and f != "__init__.py"
+                f for f in versions if f.endswith(".py") and f != "__init__.py"
             ]
             assert len(migration_files) == 2
 
@@ -96,9 +82,7 @@ class TestHistoryCommand:
             assert result.exit_code == 0
             assert "No migration revisions" in result.output
 
-    def test_history_with_revisions(
-        self, runner, tmp_path
-    ):
+    def test_history_with_revisions(self, runner, tmp_path):
         with runner.isolated_filesystem(temp_dir=tmp_path):
             runner.invoke(cli, ["init"])
             runner.invoke(
@@ -123,9 +107,7 @@ class TestHeadsCommand:
             assert result.exit_code == 0
             assert "No migration revisions" in result.output
 
-    def test_heads_with_revisions(
-        self, runner, tmp_path
-    ):
+    def test_heads_with_revisions(self, runner, tmp_path):
         with runner.isolated_filesystem(temp_dir=tmp_path):
             runner.invoke(cli, ["init"])
             runner.invoke(
@@ -150,24 +132,15 @@ class TestUpgradeCommand:
                 ["revision", "-m", "create users"],
             )
 
-            with patch(
-                "pyignite_migrate.migration.Client"
-            ) as MockClient:
+            with patch("pyignite_migrate.migration.Client") as MockClient:
                 MockClient.return_value = mock_client
-                result = runner.invoke(
-                    cli, ["upgrade"]
-                )
+                result = runner.invoke(cli, ["upgrade"])
                 assert result.exit_code == 0
-                assert (
-                    "Applied 1 migration"
-                    in result.output
-                )
+                assert "Applied 1 migration" in result.output
 
 
 class TestDowngradeCommand:
-    def test_downgrade_base_with_mock(
-        self, runner, tmp_path
-    ):
+    def test_downgrade_base_with_mock(self, runner, tmp_path):
         mock_client = MagicMock()
         call_count = [0]
 
@@ -187,13 +160,9 @@ class TestDowngradeCommand:
                 ["revision", "-m", "create users"],
             )
 
-            with patch(
-                "pyignite_migrate.migration.Client"
-            ) as MockClient:
+            with patch("pyignite_migrate.migration.Client") as MockClient:
                 MockClient.return_value = mock_client
-                result = runner.invoke(
-                    cli, ["downgrade", "base"]
-                )
+                result = runner.invoke(cli, ["downgrade", "base"])
                 assert result.exit_code == 0
 
 
@@ -205,9 +174,7 @@ class TestCurrentCommand:
         with runner.isolated_filesystem(temp_dir=tmp_path):
             runner.invoke(cli, ["init"])
 
-            with patch(
-                "pyignite_migrate.migration.Client"
-            ) as MockClient:
+            with patch("pyignite_migrate.migration.Client") as MockClient:
                 MockClient.return_value = mock_client
                 result = runner.invoke(cli, ["current"])
                 assert result.exit_code == 0
@@ -229,19 +196,13 @@ class TestStampCommand:
             # Get the revision ID
             versions = os.listdir("migrations/versions")
             migration_file = [
-                f
-                for f in versions
-                if f.endswith(".py") and f != "__init__.py"
+                f for f in versions if f.endswith(".py") and f != "__init__.py"
             ][0]
             rev_id = migration_file.split("_")[0]
 
-            with patch(
-                "pyignite_migrate.migration.Client"
-            ) as MockClient:
+            with patch("pyignite_migrate.migration.Client") as MockClient:
                 MockClient.return_value = mock_client
-                result = runner.invoke(
-                    cli, ["stamp", rev_id]
-                )
+                result = runner.invoke(cli, ["stamp", rev_id])
                 assert result.exit_code == 0
                 assert "Stamped" in result.output
 
@@ -252,12 +213,8 @@ class TestStampCommand:
         with runner.isolated_filesystem(temp_dir=tmp_path):
             runner.invoke(cli, ["init"])
 
-            with patch(
-                "pyignite_migrate.migration.Client"
-            ) as MockClient:
+            with patch("pyignite_migrate.migration.Client") as MockClient:
                 MockClient.return_value = mock_client
-                result = runner.invoke(
-                    cli, ["stamp", "base"]
-                )
+                result = runner.invoke(cli, ["stamp", "base"])
                 assert result.exit_code == 0
                 assert "Stamped database as: (base)" in result.output

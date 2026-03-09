@@ -1,5 +1,4 @@
 import pytest
-from unittest.mock import MagicMock
 
 from pyignite_migrate.errors import MigrationError
 from pyignite_migrate.operations import Operations, _context
@@ -23,9 +22,7 @@ def configured_op(mock_client):
 class TestOperationsContext:
     def test_no_context_raises(self):
         op = Operations()
-        with pytest.raises(
-            MigrationError, match="No migration context"
-        ):
+        with pytest.raises(MigrationError, match="No migration context"):
             op.execute_sql("SELECT 1")
 
     def test_configure_and_use(self, mock_client):
@@ -53,9 +50,7 @@ class TestExecuteSQL:
         )
 
     def test_with_args(self, configured_op, mock_client):
-        configured_op.execute_sql(
-            "SELECT ?", query_args=[42]
-        )
+        configured_op.execute_sql("SELECT ?", query_args=[42])
         mock_client.sql.assert_called_once_with(
             "SELECT ?",
             query_args=[42],
@@ -63,12 +58,8 @@ class TestExecuteSQL:
             include_field_names=False,
         )
 
-    def test_schema_override(
-        self, configured_op, mock_client
-    ):
-        configured_op.execute_sql(
-            "SELECT 1", schema="OTHER"
-        )
+    def test_schema_override(self, configured_op, mock_client):
+        configured_op.execute_sql("SELECT 1", schema="OTHER")
         mock_client.sql.assert_called_once_with(
             "SELECT 1",
             query_args=None,
@@ -78,30 +69,18 @@ class TestExecuteSQL:
 
 
 class TestCacheOperations:
-    def test_create_cache(
-        self, configured_op, mock_client
-    ):
+    def test_create_cache(self, configured_op, mock_client):
         configured_op.create_cache("my_cache")
-        mock_client.create_cache.assert_called_once_with(
-            "my_cache"
-        )
+        mock_client.create_cache.assert_called_once_with("my_cache")
 
-    def test_create_cache_with_config(
-        self, configured_op, mock_client
-    ):
-        configured_op.create_cache(
-            "my_cache", config={"BACKUPS": 2}
-        )
+    def test_create_cache_with_config(self, configured_op, mock_client):
+        configured_op.create_cache("my_cache", config={"BACKUPS": 2})
         mock_client.create_cache.assert_called_once()
         args = mock_client.create_cache.call_args[0][0]
         assert args["CACHE_NAME"] == "my_cache"
         assert args["BACKUPS"] == 2
 
-    def test_destroy_cache(
-        self, configured_op, mock_client
-    ):
+    def test_destroy_cache(self, configured_op, mock_client):
         configured_op.destroy_cache("my_cache")
-        mock_client.get_cache.assert_called_once_with(
-            "my_cache"
-        )
+        mock_client.get_cache.assert_called_once_with("my_cache")
         mock_client.get_cache.return_value.destroy.assert_called_once()

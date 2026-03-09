@@ -1,7 +1,6 @@
-import os
+from unittest.mock import MagicMock
 
 import pytest
-from unittest.mock import MagicMock
 
 from pyignite_migrate.config import Config
 
@@ -48,7 +47,7 @@ def sample_migration_files(tmp_project):
     versions_dir = tmp_project / "migrations" / "versions"
 
     (versions_dir / "aaa111222333_create_users.py").write_text(
-        '''\
+        """\
 from pyignite_migrate.operations import op
 
 revision = "aaa111222333"
@@ -64,11 +63,11 @@ def upgrade():
 
 def downgrade():
     op.execute_sql("DROP TABLE IF EXISTS users")
-'''
+"""
     )
 
     (versions_dir / "bbb444555666_add_email.py").write_text(
-        '''\
+        """\
 from pyignite_migrate.operations import op
 
 revision = "bbb444555666"
@@ -86,7 +85,7 @@ def downgrade():
     op.execute_sql(
         "ALTER TABLE users DROP COLUMN email"
     )
-'''
+"""
     )
 
     return tmp_project

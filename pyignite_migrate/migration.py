@@ -1,11 +1,9 @@
-from typing import Optional, List
-
 from pyignite.client import Client
 
 from pyignite_migrate.config import Config
 from pyignite_migrate.errors import MigrationError
 from pyignite_migrate.operations import _context as ops_context
-from pyignite_migrate.revision import Revision, RevisionMap
+from pyignite_migrate.revision import Revision
 from pyignite_migrate.script import ScriptDirectory
 
 
@@ -15,7 +13,7 @@ class MigrationContext:
     def __init__(self, config: Config, script_dir: ScriptDirectory):
         self.config = config
         self.script_dir = script_dir
-        self._client: Optional[Client] = None
+        self._client: Client | None = None
 
     def connect(self) -> None:
         self._client = Client()
@@ -32,13 +30,17 @@ class MigrationContext:
             raise MigrationError("Not connected to Ignite cluster")
         return self._client
 
-    def __enter__(self):
+    def __enter__(self) -> "MigrationContext":
         self.connect()
         return self
 
-    def __exit__(self, exc_type, exc_val, exc_tb):
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: object,
+    ) -> None:
         self.close()
-        return False
 
     def ensure_version_table(self) -> None:
         table = self.config.version_table
@@ -52,7 +54,7 @@ class MigrationContext:
         cursor = self.client.sql(sql, schema=schema)
         list(cursor)
 
-    def get_current_revision(self) -> Optional[str]:
+    def get_current_revision(self) -> str | None:
         self.ensure_version_table()
         table = self.config.version_table
         schema = self.config.schema
@@ -65,9 +67,10 @@ class MigrationContext:
         rows = list(cursor)
         if not rows:
             return None
-        return rows[0][0]
+        result: str = rows[0][0]
+        return result
 
-    def set_current_revision(self, revision: Optional[str]) -> None:
+    def set_current_revision(self, revision: str | None) -> None:
         table = self.config.version_table
         schema = self.config.schema
 
@@ -82,11 +85,11 @@ class MigrationContext:
             )
             list(cursor)
 
-    def stamp(self, revision: Optional[str]) -> None:
+    def stamp(self, revision: str | None) -> None:
         self.ensure_version_table()
         self.set_current_revision(revision)
 
-    def run_upgrade(self, target: Optional[str] = None) -> List[str]:
+    def run_upgrade(self, target: str | None = None) -> list[str]:
         self.ensure_version_table()
         rev_map = self.script_dir.get_revision_map()
         current = self.get_current_revision()
@@ -98,8 +101,7 @@ class MigrationContext:
             heads = rev_map.get_heads()
             if len(heads) > 1:
                 raise MigrationError(
-                    f"Multiple heads detected: {heads}. "
-                    f"Specify a target revision."
+                    f"Multiple heads detected: {heads}. Specify a target revision."
                 )
             target = heads[0]
 
@@ -116,7 +118,7 @@ class MigrationContext:
 
         return applied
 
-    def run_downgrade(self, target: Optional[str] = None) -> List[str]:
+    def run_downgrade(self, target: str | None = None) -> list[str]:
         self.ensure_version_table()
         rev_map = self.script_dir.get_revision_map()
         current = self.get_current_revision()
@@ -147,8 +149,7 @@ class MigrationContext:
             func()
         except Exception as e:
             raise MigrationError(
-                f"Error running {direction}() for revision "
-                f"{rev.revision}: {e}"
+                f"Error running {direction}() for revision {rev.revision}: {e}"
             ) from e
         finally:
             ops_context.clear()

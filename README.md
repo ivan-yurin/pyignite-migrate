@@ -128,11 +128,19 @@ schema = PUBLIC
 version_table = __pyignite_migrate_version
 ```
 
+## Requirements
+
+- Python >= 3.10
+- Apache Ignite with thin client protocol
+
 ## Development
 
 ```bash
 uv sync
 uv run pytest tests/ -v
+uv run ruff check .
+uv run ruff format --check .
+uv run mypy pyignite_migrate/
 ```
 
 ## Release

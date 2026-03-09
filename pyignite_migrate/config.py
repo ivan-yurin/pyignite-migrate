@@ -1,7 +1,6 @@
 import configparser
 import os
-from dataclasses import dataclass, field
-from typing import Optional, List, Tuple
+from dataclasses import dataclass
 
 from pyignite_migrate.errors import ConfigurationError
 
@@ -14,7 +13,7 @@ DEFAULT_VERSION_TABLE = "__pyignite_migrate_version"
 class Config:
     """Parsed configuration for pyignite-migrate."""
 
-    hosts: List[Tuple[str, int]]
+    hosts: list[tuple[str, int]]
     script_location: str
     version_table: str = DEFAULT_VERSION_TABLE
     schema: str = DEFAULT_SCHEMA
@@ -22,7 +21,7 @@ class Config:
     config_dir: str = ""
 
     @classmethod
-    def from_file(cls, path: Optional[str] = None) -> "Config":
+    def from_file(cls, path: str | None = None) -> "Config":
         if path is None:
             path = cls._find_config_file()
         if not os.path.isfile(path):
@@ -57,7 +56,7 @@ class Config:
         )
 
     @staticmethod
-    def _parse_hosts(hosts_raw: str) -> List[Tuple[str, int]]:
+    def _parse_hosts(hosts_raw: str) -> list[tuple[str, int]]:
         result = []
         for entry in hosts_raw.split(","):
             entry = entry.strip()

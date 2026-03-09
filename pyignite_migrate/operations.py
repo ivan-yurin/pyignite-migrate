@@ -1,4 +1,5 @@
-from typing import Optional, Any, Dict, List, Sequence
+from collections.abc import Sequence
+from typing import Any
 
 from pyignite_migrate.errors import MigrationError
 
@@ -6,19 +7,19 @@ from pyignite_migrate.errors import MigrationError
 class _OperationsContext:
     """Holds the current migration execution context."""
 
-    def __init__(self):
-        self._client = None
+    def __init__(self) -> None:
+        self._client: Any = None
         self._schema: str = "PUBLIC"
 
-    def configure(self, client, schema: str = "PUBLIC"):
+    def configure(self, client: Any, schema: str = "PUBLIC") -> None:
         self._client = client
         self._schema = schema
 
-    def clear(self):
+    def clear(self) -> None:
         self._client = None
 
     @property
-    def client(self):
+    def client(self) -> Any:
         if self._client is None:
             raise MigrationError(
                 "No migration context is active. Operations can only be "
@@ -45,9 +46,9 @@ class Operations:
     def execute_sql(
         self,
         query: str,
-        query_args: Optional[Sequence] = None,
-        schema: Optional[str] = None,
-    ) -> List[Any]:
+        query_args: Sequence | None = None,
+        schema: str | None = None,
+    ) -> list[Any]:
         target_schema = schema or _context.schema
         cursor = _context.client.sql(
             query,
@@ -60,10 +61,13 @@ class Operations:
     def create_cache(
         self,
         name: str,
-        config: Optional[Dict[str, Any]] = None,
+        config: dict[str, Any] | None = None,
     ) -> None:
         if config is not None:
-            settings = {**config, "CACHE_NAME": name} if "CACHE_NAME" not in config else config
+            if "CACHE_NAME" not in config:
+                settings = {**config, "CACHE_NAME": name}
+            else:
+                settings = config
             _context.client.create_cache(settings)
         else:
             _context.client.create_cache(name)

@@ -1,13 +1,13 @@
 import importlib.util
 import os
 import re
+import types
 from datetime import datetime, timezone
-from typing import Optional, List
 
 from mako.template import Template
 
 from pyignite_migrate.config import Config
-from pyignite_migrate.errors import ScriptError, RevisionError
+from pyignite_migrate.errors import RevisionError, ScriptError
 from pyignite_migrate.revision import Revision, RevisionMap
 
 _MIGRATION_FILE_RE = re.compile(r"^([a-f0-9]+)_.*\.py$")
@@ -20,7 +20,7 @@ class ScriptDirectory:
         self.config = config
         self.dir = config.get_script_location_abs()
         self.versions_dir = os.path.join(self.dir, "versions")
-        self._revision_map: Optional[RevisionMap] = None
+        self._revision_map: RevisionMap | None = None
 
     @property
     def env_py_path(self) -> str:
@@ -36,14 +36,8 @@ class ScriptDirectory:
         self._revision_map = None
 
     def _next_revision_id(self, rev_map: RevisionMap) -> str:
-        existing_ids = {
-            rev.revision for rev in rev_map.get_all_revisions()
-        }
-        numeric_ids = [
-            int(rev_id)
-            for rev_id in existing_ids
-            if rev_id.isdigit()
-        ]
+        existing_ids = {rev.revision for rev in rev_map.get_all_revisions()}
+        numeric_ids = [int(rev_id) for rev_id in existing_ids if rev_id.isdigit()]
 
         next_id = max(numeric_ids, default=0) + 1
         if next_id > 9999:
@@ -64,7 +58,7 @@ class ScriptDirectory:
 
         return next_rev_id
 
-    def _load_revisions(self) -> List[Revision]:
+    def _load_revisions(self) -> list[Revision]:
         if not os.path.isdir(self.versions_dir):
             return []
 
@@ -85,7 +79,7 @@ class ScriptDirectory:
         return revisions
 
     @staticmethod
-    def _load_module(filepath: str, filename: str) -> object:
+    def _load_module(filepath: str, filename: str) -> types.ModuleType:
         module_name = filename.replace(".py", "")
         spec = importlib.util.spec_from_file_location(module_name, filepath)
         if spec is None or spec.loader is None:
@@ -95,28 +89,24 @@ class ScriptDirectory:
         try:
             spec.loader.exec_module(module)
         except Exception as e:
-            raise ScriptError(
-                f"Error loading migration {filepath}: {e}"
-            ) from e
+            raise ScriptError(f"Error loading migration {filepath}: {e}") from e
 
         return module
 
     @staticmethod
-    def _module_to_revision(module: object, filepath: str) -> Revision:
+    def _module_to_revision(module: types.ModuleType, filepath: str) -> Revision:
         for attr in ("revision", "upgrade", "downgrade"):
             if not hasattr(module, attr):
                 raise ScriptError(
                     f"Migration {filepath} is missing required attribute: {attr}"
                 )
 
-        revision_id = getattr(module, "revision")
+        revision_id = module.revision
         down_revision = getattr(module, "down_revision", None)
         description = getattr(module, "description", "")
 
         if not isinstance(revision_id, str) or not revision_id:
-            raise ScriptError(
-                f"Migration {filepath} has invalid 'revision' attribute"
-            )
+            raise ScriptError(f"Migration {filepath} has invalid 'revision' attribute")
 
         return Revision(
             revision=revision_id,
@@ -128,7 +118,7 @@ class ScriptDirectory:
     def generate_revision(
         self,
         message: str,
-        head: Optional[str] = None,
+        head: str | None = None,
     ) -> str:
         rev_map = self.get_revision_map()
         rev_id = self._next_revision_id(rev_map)
@@ -142,8 +132,7 @@ class ScriptDirectory:
                 heads = rev_map.get_heads()
                 if len(heads) > 1:
                     raise RevisionError(
-                        f"Multiple heads found: {heads}. "
-                        f"Specify --head to choose one."
+                        f"Multiple heads found: {heads}. Specify --head to choose one."
                     )
                 down_revision = heads[0]
 
@@ -157,9 +146,7 @@ class ScriptDirectory:
             revision=rev_id,
             down_revision=repr(down_revision),
             description=message or "",
-            create_date=datetime.now(timezone.utc).strftime(
-                "%Y-%m-%d %H:%M:%S"
-            ),
+            create_date=datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S"),
         )
 
         filename = f"{rev_id}_{slug}.py"

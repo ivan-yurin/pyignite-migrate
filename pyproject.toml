@@ -4,7 +4,7 @@ description = "Database migration tool for Apache Ignite"
 dynamic = ["version"]
 readme = "README.md"
 license = {text = "Apache-2.0"}
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 authors = [
     {name = "Ivan Yurin"},
 ]
@@ -20,7 +20,6 @@ classifiers = [
     "License :: OSI Approved :: Apache Software License",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3 :: Only",
-    "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
@@ -40,9 +39,11 @@ Issues = "https://github.com/ivan-yurin/pyignite-migrate/issues"
 
 [project.optional-dependencies]
 dev = [
-    "pytest>=7.0",
-    "pytest-mock>=3.0",
-    "coverage>=7.0",
+    "pytest>=9.0",
+    "pytest-mock>=3.15",
+    "coverage>=7.13",
+    "ruff>=0.15",
+    "mypy>=1.19",
 ]
 
 [project.scripts]
@@ -50,9 +51,11 @@ pyignite-migrate = "pyignite_migrate.cli:cli"
 
 [dependency-groups]
 dev = [
-    "pytest>=7.0",
-    "pytest-mock>=3.0",
-    "coverage>=7.0",
+    "pytest>=9.0",
+    "pytest-mock>=3.15",
+    "coverage>=7.13",
+    "ruff>=0.15",
+    "mypy>=1.19",
 ]
 
 [build-system]
@@ -71,3 +74,23 @@ exclude = [
 
 [tool.hatch.build.targets.wheel]
 packages = ["pyignite_migrate"]
+
+[tool.mypy]
+python_version = "3.10"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+
+[[tool.mypy.overrides]]
+module = ["pyignite.*", "mako.*"]
+ignore_missing_imports = true
+
+[tool.ruff]
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B", "SIM", "N"]
+per-file-ignores = {"tests/**" = ["N806"]}
+
+[tool.ruff.lint.isort]
+known-first-party = ["pyignite_migrate"]

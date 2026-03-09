@@ -6,22 +6,13 @@ from pyignite_migrate.script import ScriptDirectory
 
 class TestScriptDirectory:
     def test_empty_versions(self, tmp_project):
-        config = Config.from_file(
-            str(tmp_project / "pyignite_migrate.ini")
-        )
+        config = Config.from_file(str(tmp_project / "pyignite_migrate.ini"))
         sd = ScriptDirectory(config)
         rev_map = sd.get_revision_map()
         assert rev_map.is_empty()
 
-    def test_load_migration_files(
-        self, sample_migration_files
-    ):
-        config = Config.from_file(
-            str(
-                sample_migration_files
-                / "pyignite_migrate.ini"
-            )
-        )
+    def test_load_migration_files(self, sample_migration_files):
+        config = Config.from_file(str(sample_migration_files / "pyignite_migrate.ini"))
         sd = ScriptDirectory(config)
         rev_map = sd.get_revision_map()
         assert not rev_map.is_empty()
@@ -29,9 +20,7 @@ class TestScriptDirectory:
         assert rev_map.get_bases() == ["aaa111222333"]
 
     def test_generate_revision_first(self, tmp_project):
-        config = Config.from_file(
-            str(tmp_project / "pyignite_migrate.ini")
-        )
+        config = Config.from_file(str(tmp_project / "pyignite_migrate.ini"))
         sd = ScriptDirectory(config)
         rev_id = sd.generate_revision("create users table")
         assert rev_id == "0001"
@@ -46,12 +35,8 @@ class TestScriptDirectory:
         assert files[0].startswith(rev_id)
         assert "create_users_table" in files[0]
 
-    def test_generate_revision_sequential_numbers(
-        self, tmp_project
-    ):
-        config = Config.from_file(
-            str(tmp_project / "pyignite_migrate.ini")
-        )
+    def test_generate_revision_sequential_numbers(self, tmp_project):
+        config = Config.from_file(str(tmp_project / "pyignite_migrate.ini"))
         sd = ScriptDirectory(config)
 
         first = sd.generate_revision("first")
@@ -60,15 +45,8 @@ class TestScriptDirectory:
         assert first == "0001"
         assert second == "0002"
 
-    def test_generate_revision_chained(
-        self, sample_migration_files
-    ):
-        config = Config.from_file(
-            str(
-                sample_migration_files
-                / "pyignite_migrate.ini"
-            )
-        )
+    def test_generate_revision_chained(self, sample_migration_files):
+        config = Config.from_file(str(sample_migration_files / "pyignite_migrate.ini"))
         sd = ScriptDirectory(config)
         rev_id = sd.generate_revision("add phone column")
         assert rev_id == "0001"
@@ -78,9 +56,7 @@ class TestScriptDirectory:
         assert rev.down_revision == "bbb444555666"
 
     def test_invalidate_clears_cache(self, tmp_project):
-        config = Config.from_file(
-            str(tmp_project / "pyignite_migrate.ini")
-        )
+        config = Config.from_file(str(tmp_project / "pyignite_migrate.ini"))
         sd = ScriptDirectory(config)
         rev_map1 = sd.get_revision_map()
         assert rev_map1.is_empty()
@@ -105,16 +81,10 @@ script_location = nonexistent
 
 class TestSlugify:
     def test_basic(self):
-        assert (
-            ScriptDirectory._slugify("Create users table")
-            == "create_users_table"
-        )
+        assert ScriptDirectory._slugify("Create users table") == "create_users_table"
 
     def test_special_chars(self):
-        assert (
-            ScriptDirectory._slugify("add email@column!")
-            == "add_email_column"
-        )
+        assert ScriptDirectory._slugify("add email@column!") == "add_email_column"
 
     def test_truncation(self):
         long_text = "a" * 100
@@ -122,7 +92,4 @@ class TestSlugify:
         assert len(slug) <= 50
 
     def test_strips_underscores(self):
-        assert (
-            ScriptDirectory._slugify("  hello world  ")
-            == "hello_world"
-        )
+        assert ScriptDirectory._slugify("  hello world  ") == "hello_world"

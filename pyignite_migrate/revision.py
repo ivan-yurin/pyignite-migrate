@@ -1,4 +1,4 @@
-from typing import Optional, List, Set, Dict, FrozenSet
+import types
 
 from pyignite_migrate.errors import RevisionError
 
@@ -9,15 +9,15 @@ class Revision:
     def __init__(
         self,
         revision: str,
-        down_revision: Optional[str],
+        down_revision: str | None,
         description: str = "",
-        module: object = None,
+        module: types.ModuleType | None = None,
     ):
         self.revision = revision
         self.down_revision = down_revision
         self.description = description
         self.module = module
-        self.nextrev: FrozenSet[str] = frozenset()
+        self.nextrev: frozenset[str] = frozenset()
 
     @property
     def is_base(self) -> bool:
@@ -34,8 +34,8 @@ class Revision:
 class RevisionMap:
     """Builds and manages the directed acyclic graph of revisions."""
 
-    def __init__(self, revisions: List[Revision]):
-        self._revisions: Dict[str, Revision] = {}
+    def __init__(self, revisions: list[Revision]):
+        self._revisions: dict[str, Revision] = {}
 
         for rev in revisions:
             if rev.revision in self._revisions:
@@ -46,9 +46,7 @@ class RevisionMap:
         self._validate()
 
     def _build_nextrev_links(self) -> None:
-        children: Dict[str, Set[str]] = {
-            rev_id: set() for rev_id in self._revisions
-        }
+        children: dict[str, set[str]] = {rev_id: set() for rev_id in self._revisions}
         for rev in self._revisions.values():
             if rev.down_revision is not None and rev.down_revision in children:
                 children[rev.down_revision].add(rev.revision)
@@ -73,29 +71,19 @@ class RevisionMap:
             raise RevisionError(f"Revision not found: {rev_id!r}")
         return self._revisions[rev_id]
 
-    def get_heads(self) -> List[str]:
-        return sorted(
-            rev.revision
-            for rev in self._revisions.values()
-            if rev.is_head
-        )
+    def get_heads(self) -> list[str]:
+        return sorted(rev.revision for rev in self._revisions.values() if rev.is_head)
 
-    def get_bases(self) -> List[str]:
-        return sorted(
-            rev.revision
-            for rev in self._revisions.values()
-            if rev.is_base
-        )
+    def get_bases(self) -> list[str]:
+        return sorted(rev.revision for rev in self._revisions.values() if rev.is_base)
 
-    def _topological_sort(self) -> List[str]:
-        in_degree: Dict[str, int] = {rev_id: 0 for rev_id in self._revisions}
+    def _topological_sort(self) -> list[str]:
+        in_degree: dict[str, int] = {rev_id: 0 for rev_id in self._revisions}
         for rev in self._revisions.values():
             if rev.down_revision is not None:
                 in_degree[rev.revision] += 1
 
-        queue = sorted(
-            rev_id for rev_id, deg in in_degree.items() if deg == 0
-        )
+        queue = sorted(rev_id for rev_id, deg in in_degree.items() if deg == 0)
         result = []
 
         while queue:
@@ -115,18 +103,16 @@ class RevisionMap:
 
     def get_upgrade_path(
         self,
-        current: Optional[str],
+        current: str | None,
         target: str,
-    ) -> List[Revision]:
+    ) -> list[Revision]:
         topo_order = self._topological_sort()
 
         if current is None:
             start_idx = -1
         else:
             if current not in self._revisions:
-                raise RevisionError(
-                    f"Current revision not found: {current!r}"
-                )
+                raise RevisionError(f"Current revision not found: {current!r}")
             start_idx = topo_order.index(current)
 
         if target not in self._revisions:
@@ -146,38 +132,28 @@ class RevisionMap:
             ancestors.discard(current)
         ancestors.add(target)
 
-        return [
-            self._revisions[rev_id]
-            for rev_id in path_ids
-            if rev_id in ancestors
-        ]
+        return [self._revisions[rev_id] for rev_id in path_ids if rev_id in ancestors]
 
     def get_downgrade_path(
         self,
         current: str,
-        target: Optional[str],
-    ) -> List[Revision]:
+        target: str | None,
+    ) -> list[Revision]:
         topo_order = self._topological_sort()
 
         if current not in self._revisions:
-            raise RevisionError(
-                f"Current revision not found: {current!r}"
-            )
+            raise RevisionError(f"Current revision not found: {current!r}")
         current_idx = topo_order.index(current)
 
         if target is None:
             target_idx = -1
         else:
             if target not in self._revisions:
-                raise RevisionError(
-                    f"Target revision not found: {target!r}"
-                )
+                raise RevisionError(f"Target revision not found: {target!r}")
             target_idx = topo_order.index(target)
 
         if target_idx >= current_idx:
-            raise RevisionError(
-                f"Target {target!r} is not behind current {current!r}"
-            )
+            raise RevisionError(f"Target {target!r} is not behind current {current!r}")
 
         path_ids = topo_order[target_idx + 1 : current_idx + 1]
 
@@ -193,15 +169,15 @@ class RevisionMap:
             if rev_id in ancestors
         ]
 
-    def _get_ancestors(self, rev_id: str) -> Set[str]:
-        result: Set[str] = set()
+    def _get_ancestors(self, rev_id: str) -> set[str]:
+        result: set[str] = set()
         current = self._revisions[rev_id].down_revision
         while current is not None:
             result.add(current)
             current = self._revisions[current].down_revision
         return result
 
-    def get_all_revisions(self) -> List[Revision]:
+    def get_all_revisions(self) -> list[Revision]:
         topo = self._topological_sort()
         return [self._revisions[rev_id] for rev_id in topo]
 

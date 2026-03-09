@@ -3,7 +3,7 @@ import sys
 
 import click
 
-from pyignite_migrate.config import Config, DEFAULT_CONFIG_FILENAME
+from pyignite_migrate.config import DEFAULT_CONFIG_FILENAME, Config
 from pyignite_migrate.errors import PyIgniteMigrateError
 from pyignite_migrate.migration import MigrationContext
 from pyignite_migrate.script import ScriptDirectory
@@ -18,13 +18,13 @@ from pyignite_migrate.script import ScriptDirectory
     help=f"Path to configuration file (default: search for {DEFAULT_CONFIG_FILENAME})",
 )
 @click.pass_context
-def cli(ctx, config):
+def cli(ctx: click.Context, config: str | None) -> None:
     """pyignite-migrate: Database migration tool for Apache Ignite."""
     ctx.ensure_object(dict)
     ctx.obj["config_path"] = config
 
 
-def _load_config(ctx) -> Config:
+def _load_config(ctx: click.Context) -> Config:
     config_path = ctx.obj.get("config_path")
     return Config.from_file(config_path)
 
@@ -37,13 +37,11 @@ def _load_config(ctx) -> Config:
     help="Directory name for migration scripts (default: migrations)",
 )
 @click.pass_context
-def init(ctx, directory):
+def init(ctx: click.Context, directory: str) -> None:
     """Initialize a new migration environment."""
     from mako.template import Template
 
-    templates_dir = os.path.join(
-        os.path.dirname(__file__), "templates"
-    )
+    templates_dir = os.path.join(os.path.dirname(__file__), "templates")
     target_dir = os.path.join(os.getcwd(), directory)
 
     versions_dir = os.path.join(target_dir, "versions")
@@ -54,9 +52,7 @@ def init(ctx, directory):
         click.echo(f"Config file already exists: {ini_path}")
     else:
         ini_template = Template(
-            filename=os.path.join(
-                templates_dir, "pyignite_migrate.ini.mako"
-            )
+            filename=os.path.join(templates_dir, "pyignite_migrate.ini.mako")
         )
         with open(ini_path, "w") as f:
             f.write(ini_template.render(script_location=directory))
@@ -66,9 +62,7 @@ def init(ctx, directory):
     if os.path.exists(env_path):
         click.echo(f"env.py already exists: {env_path}")
     else:
-        env_template = Template(
-            filename=os.path.join(templates_dir, "env.py.mako")
-        )
+        env_template = Template(filename=os.path.join(templates_dir, "env.py.mako"))
         with open(env_path, "w") as f:
             f.write(env_template.render())
         click.echo(f"Created env.py: {env_path}")
@@ -78,27 +72,19 @@ def init(ctx, directory):
         with open(init_path, "w") as f:
             f.write("")
 
-    click.echo(
-        f"Migration environment initialized in '{directory}/'"
-    )
+    click.echo(f"Migration environment initialized in '{directory}/'")
 
 
 @cli.command()
-@click.option(
-    "-m", "--message", default=None, help="Migration description"
-)
-@click.option(
-    "--head", default=None, help="Head revision to branch from"
-)
+@click.option("-m", "--message", default=None, help="Migration description")
+@click.option("--head", default=None, help="Head revision to branch from")
 @click.pass_context
-def revision(ctx, message, head):
+def revision(ctx: click.Context, message: str | None, head: str | None) -> None:
     """Create a new migration revision file."""
     try:
         config = _load_config(ctx)
         script_dir = ScriptDirectory(config)
-        rev_id = script_dir.generate_revision(
-            message=message or "", head=head
-        )
+        rev_id = script_dir.generate_revision(message=message or "", head=head)
         click.echo(f"Generated new revision: {rev_id}")
     except PyIgniteMigrateError as e:
         click.echo(f"Error: {e}", err=True)
@@ -108,7 +94,7 @@ def revision(ctx, message, head):
 @cli.command()
 @click.argument("target", default="head")
 @click.pass_context
-def upgrade(ctx, target):
+def upgrade(ctx: click.Context, target: str) -> None:
     """Upgrade to a target revision.
 
     TARGET can be a revision ID or 'head' (default) for latest.
@@ -127,9 +113,7 @@ def upgrade(ctx, target):
         if applied:
             click.echo(f"Applied {len(applied)} migration(s):")
             for rev_id in applied:
-                rev = script_dir.get_revision_map().get_revision(
-                    rev_id
-                )
+                rev = script_dir.get_revision_map().get_revision(rev_id)
                 click.echo(f"  -> {rev_id}: {rev.description}")
         else:
             click.echo("No migrations to apply.")
@@ -142,7 +126,7 @@ def upgrade(ctx, target):
 @cli.command()
 @click.argument("target")
 @click.pass_context
-def downgrade(ctx, target):
+def downgrade(ctx: click.Context, target: str) -> None:
     """Downgrade to a target revision.
 
     TARGET can be a revision ID, 'base' (revert all), or '-1' (revert one).
@@ -160,9 +144,7 @@ def downgrade(ctx, target):
                 steps = int(target)
                 current = mctx.get_current_revision()
                 if current is None:
-                    click.echo(
-                        "Already at base, nothing to downgrade."
-                    )
+                    click.echo("Already at base, nothing to downgrade.")
                     return
                 rev_map = script_dir.get_revision_map()
                 rev = rev_map.get_revision(current)
@@ -180,9 +162,7 @@ def downgrade(ctx, target):
         if reverted:
             click.echo(f"Reverted {len(reverted)} migration(s):")
             for rev_id in reverted:
-                rev = script_dir.get_revision_map().get_revision(
-                    rev_id
-                )
+                rev = script_dir.get_revision_map().get_revision(rev_id)
                 click.echo(f"  <- {rev_id}: {rev.description}")
         else:
             click.echo("No migrations to revert.")
@@ -194,7 +174,7 @@ def downgrade(ctx, target):
 
 @cli.command()
 @click.pass_context
-def current(ctx):
+def current(ctx: click.Context) -> None:
     """Show the current migration revision."""
     try:
         config = _load_config(ctx)
@@ -204,16 +184,12 @@ def current(ctx):
             rev_id = mctx.get_current_revision()
 
         if rev_id is None:
-            click.echo(
-                "Current revision: (base) - no migrations applied"
-            )
+            click.echo("Current revision: (base) - no migrations applied")
         else:
             rev_map = script_dir.get_revision_map()
             rev = rev_map.get_revision(rev_id)
             head_marker = " (head)" if rev.is_head else ""
-            click.echo(
-                f"Current revision: {rev_id}{head_marker}"
-            )
+            click.echo(f"Current revision: {rev_id}{head_marker}")
             if rev.description:
                 click.echo(f"  Description: {rev.description}")
 
@@ -224,7 +200,7 @@ def current(ctx):
 
 @cli.command()
 @click.pass_context
-def history(ctx):
+def history(ctx: click.Context) -> None:
     """Show the full migration history in topological order."""
     try:
         config = _load_config(ctx)
@@ -253,9 +229,7 @@ def history(ctx):
             if rev.revision == current_rev:
                 markers.append("current")
 
-            marker_str = (
-                f" ({', '.join(markers)})" if markers else ""
-            )
+            marker_str = f" ({', '.join(markers)})" if markers else ""
             down = rev.down_revision or "(base)"
             click.echo(
                 f"{rev.revision} -> {down}{marker_str}: "
@@ -269,7 +243,7 @@ def history(ctx):
 
 @cli.command()
 @click.pass_context
-def heads(ctx):
+def heads(ctx: click.Context) -> None:
     """Show current head revision(s)."""
     try:
         config = _load_config(ctx)
@@ -285,10 +259,7 @@ def heads(ctx):
         click.echo(f"Head revision(s) ({len(head_ids)}):")
         for head_id in head_ids:
             rev = rev_map.get_revision(head_id)
-            click.echo(
-                f"  {head_id}: "
-                f"{rev.description or '(no description)'}"
-            )
+            click.echo(f"  {head_id}: {rev.description or '(no description)'}")
 
     except PyIgniteMigrateError as e:
         click.echo(f"Error: {e}", err=True)
@@ -298,7 +269,7 @@ def heads(ctx):
 @cli.command()
 @click.argument("revision_id")
 @click.pass_context
-def stamp(ctx, revision_id):
+def stamp(ctx: click.Context, revision_id: str) -> None:
     """Set the version tracking table without running migrations."""
     try:
         config = _load_config(ctx)
