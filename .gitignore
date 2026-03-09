@@ -1,0 +1,31 @@
+# macOS
+.DS_Store
+
+# IDE
+.idea/
+.vscode/
+
+# LLM
+.claude/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+venv/
+.venv/
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Distribution / packaging
+*.egg-info/
+*.egg
+dist/
+build/
+*.tar.gz
+*.whl
