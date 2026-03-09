@@ -70,6 +70,9 @@ def downgrade():
     op.execute_sql("DROP TABLE IF EXISTS users")
 ```
 
+Revision IDs are generated as zero-padded sequential numbers:
+`0001`, `0002`, `0003`, ...
+
 ### 4. Apply migrations
 
 ```bash
@@ -138,11 +141,17 @@ version_table = __pyignite_migrate_version
 
 ```bash
 uv sync
+docker compose up -d --wait ignite
 uv run pytest tests/ -v
 uv run ruff check .
 uv run ruff format --check .
 uv run mypy pyignite_migrate/
+docker compose down
 ```
+
+Integration tests use a real Ignite node.
+By default they connect to `127.0.0.1:10800`.
+Override with `PYIGNITE_TEST_HOST` and `PYIGNITE_TEST_PORT`.
 
 ## Release
 

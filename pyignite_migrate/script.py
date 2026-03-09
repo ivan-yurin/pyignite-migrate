@@ -22,98 +22,11 @@ class ScriptDirectory:
         self.versions_dir = os.path.join(self.dir, "versions")
         self._revision_map: RevisionMap | None = None
 
-    @property
-    def env_py_path(self) -> str:
-        return os.path.join(self.dir, "env.py")
-
     def get_revision_map(self) -> RevisionMap:
         if self._revision_map is None:
             revisions = self._load_revisions()
             self._revision_map = RevisionMap(revisions)
         return self._revision_map
-
-    def invalidate(self) -> None:
-        self._revision_map = None
-
-    def _next_revision_id(self, rev_map: RevisionMap) -> str:
-        existing_ids = {rev.revision for rev in rev_map.get_all_revisions()}
-        numeric_ids = [int(rev_id) for rev_id in existing_ids if rev_id.isdigit()]
-
-        next_id = max(numeric_ids, default=0) + 1
-        if next_id > 9999:
-            raise ScriptError(
-                "Cannot generate revision ID: maximum 4-digit "
-                "revision number (9999) reached"
-            )
-
-        next_rev_id = f"{next_id:04d}"
-        while next_rev_id in existing_ids:
-            next_id += 1
-            if next_id > 9999:
-                raise ScriptError(
-                    "Cannot generate revision ID: maximum 4-digit "
-                    "revision number (9999) reached"
-                )
-            next_rev_id = f"{next_id:04d}"
-
-        return next_rev_id
-
-    def _load_revisions(self) -> list[Revision]:
-        if not os.path.isdir(self.versions_dir):
-            return []
-
-        revisions = []
-        for filename in sorted(os.listdir(self.versions_dir)):
-            match = _MIGRATION_FILE_RE.match(filename)
-            if match is None:
-                continue
-
-            filepath = os.path.join(self.versions_dir, filename)
-            if not os.path.isfile(filepath):
-                continue
-
-            module = self._load_module(filepath, filename)
-            rev = self._module_to_revision(module, filepath)
-            revisions.append(rev)
-
-        return revisions
-
-    @staticmethod
-    def _load_module(filepath: str, filename: str) -> types.ModuleType:
-        module_name = filename.replace(".py", "")
-        spec = importlib.util.spec_from_file_location(module_name, filepath)
-        if spec is None or spec.loader is None:
-            raise ScriptError(f"Cannot create module spec for {filepath}")
-
-        module = importlib.util.module_from_spec(spec)
-        try:
-            spec.loader.exec_module(module)
-        except Exception as e:
-            raise ScriptError(f"Error loading migration {filepath}: {e}") from e
-
-        return module
-
-    @staticmethod
-    def _module_to_revision(module: types.ModuleType, filepath: str) -> Revision:
-        for attr in ("revision", "upgrade", "downgrade"):
-            if not hasattr(module, attr):
-                raise ScriptError(
-                    f"Migration {filepath} is missing required attribute: {attr}"
-                )
-
-        revision_id = module.revision
-        down_revision = getattr(module, "down_revision", None)
-        description = getattr(module, "description", "")
-
-        if not isinstance(revision_id, str) or not revision_id:
-            raise ScriptError(f"Migration {filepath} has invalid 'revision' attribute")
-
-        return Revision(
-            revision=revision_id,
-            down_revision=down_revision,
-            description=description,
-            module=module,
-        )
 
     def generate_revision(
         self,
@@ -157,9 +70,79 @@ class ScriptDirectory:
         with open(output_path, "w") as f:
             f.write(content)
 
-        self.invalidate()
+        self._invalidate()
 
         return rev_id
+
+    def _invalidate(self) -> None:
+        self._revision_map = None
+
+    def _next_revision_id(self, rev_map: RevisionMap) -> str:
+        existing_ids = {rev.revision for rev in rev_map.get_all_revisions()}
+        numeric_ids = [int(rev_id) for rev_id in existing_ids if rev_id.isdigit()]
+
+        next_id = max(numeric_ids, default=0) + 1
+        if next_id > 9999:
+            raise ScriptError(
+                "Cannot generate revision ID: maximum 4-digit "
+                "revision number (9999) reached"
+            )
+
+        return f"{next_id:04d}"
+
+    def _load_revisions(self) -> list[Revision]:
+        if not os.path.isdir(self.versions_dir):
+            return []
+
+        revisions = []
+        for filename in sorted(os.listdir(self.versions_dir)):
+            match = _MIGRATION_FILE_RE.match(filename)
+            if match is None:
+                continue
+
+            filepath = os.path.join(self.versions_dir, filename)
+            if not os.path.isfile(filepath):
+                continue
+
+            module = self._load_module(filepath, filename)
+            rev = self._module_to_revision(module, filepath)
+            revisions.append(rev)
+
+        return revisions
+
+    @staticmethod
+    def _load_module(filepath: str, filename: str) -> types.ModuleType:
+        module_name = filename.replace(".py", "")
+        spec = importlib.util.spec_from_file_location(module_name, filepath)
+        module = importlib.util.module_from_spec(spec)  # type: ignore[arg-type]
+        try:
+            spec.loader.exec_module(module)  # type: ignore[union-attr]
+        except Exception as e:
+            raise ScriptError(f"Error loading migration {filepath}: {e}") from e
+
+        return module
+
+    @staticmethod
+    def _module_to_revision(module: types.ModuleType, filepath: str) -> Revision:
+        for attr in ("revision", "upgrade", "downgrade"):
+            if not hasattr(module, attr):
+                raise ScriptError(
+                    f"Migration {filepath} is missing required attribute: {attr}"
+                )
+
+        revision_id = module.revision
+        down_revision = getattr(module, "down_revision", None)
+        description = getattr(module, "description", "")
+
+        if not isinstance(revision_id, str) or not revision_id:
+            raise ScriptError(f"Migration {filepath} has invalid 'revision' attribute")
+
+        return Revision(
+            revision=revision_id,
+            down_revision=down_revision,
+            description=description,
+            module=module,
+        )
 
     @staticmethod
     def _slugify(text: str) -> str:

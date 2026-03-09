@@ -24,11 +24,6 @@ def cli(ctx: click.Context, config: str | None) -> None:
     ctx.obj["config_path"] = config
 
 
-def _load_config(ctx: click.Context) -> Config:
-    config_path = ctx.obj.get("config_path")
-    return Config.from_file(config_path)
-
-
 @cli.command()
 @click.option(
     "-d",
@@ -275,9 +270,9 @@ def stamp(ctx: click.Context, revision_id: str) -> None:
         config = _load_config(ctx)
         script_dir = ScriptDirectory(config)
 
-        rev_map = script_dir.get_revision_map()
         if revision_id != "base":
-            rev_map.get_revision(revision_id)
+            rev_map = script_dir.get_revision_map()
+            rev_map.check_revision(revision_id)
 
         with MigrationContext(config, script_dir) as mctx:
             if revision_id == "base":
@@ -290,3 +285,8 @@ def stamp(ctx: click.Context, revision_id: str) -> None:
     except PyIgniteMigrateError as e:
         click.echo(f"Error: {e}", err=True)
         sys.exit(1)
+
+
+def _load_config(ctx: click.Context) -> Config:
+    config_path = ctx.obj.get("config_path")
+    return Config.from_file(config_path)

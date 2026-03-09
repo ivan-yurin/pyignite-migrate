@@ -1,91 +1,84 @@
-from unittest.mock import MagicMock
+import os
+import textwrap
 
 import pytest
+from pyignite.client import Client
 
-from pyignite_migrate.config import Config
+IGNITE_HOST = os.environ.get("PYIGNITE_TEST_HOST", "127.0.0.1")
+IGNITE_PORT = int(os.environ.get("PYIGNITE_TEST_PORT", "10800"))
 
-
-@pytest.fixture
-def tmp_project(tmp_path):
-    """Create a temporary project directory with config and migrations."""
-    config_content = """\
-[pyignite_migrate]
-hosts = 127.0.0.1:10800
-script_location = migrations
-schema = PUBLIC
-version_table = __pyignite_migrate_version
-"""
-    config_path = tmp_path / "pyignite_migrate.ini"
-    config_path.write_text(config_content)
-
-    migrations_dir = tmp_path / "migrations"
-    migrations_dir.mkdir()
-    versions_dir = migrations_dir / "versions"
-    versions_dir.mkdir()
-    (versions_dir / "__init__.py").write_text("")
-
-    return tmp_path
+TEST_VERSION_TABLE = "__test_pyignite_migrate_version"
+TEST_SCHEMA = "PUBLIC"
 
 
-@pytest.fixture
-def mock_client():
-    """Create a mock pyignite Client."""
-    client = MagicMock()
-    client.sql.return_value = iter([])
-    return client
+def _ignite_available() -> bool:
+    try:
+        client = Client()
+        client.connect([(IGNITE_HOST, IGNITE_PORT)])
+        client.close()
+        return True
+    except Exception:
+        return False
 
 
-@pytest.fixture
-def sample_config(tmp_project):
-    """Load config from tmp_project."""
-    return Config.from_file(str(tmp_project / "pyignite_migrate.ini"))
+requires_ignite = pytest.mark.skipif(
+    not _ignite_available(),
+    reason=f"Apache Ignite not available at {IGNITE_HOST}:{IGNITE_PORT}",
+)
 
 
-@pytest.fixture
-def sample_migration_files(tmp_project):
-    """Create sample migration files in the tmp project."""
-    versions_dir = tmp_project / "migrations" / "versions"
-
-    (versions_dir / "aaa111222333_create_users.py").write_text(
-        """\
-from pyignite_migrate.operations import op
-
-revision = "aaa111222333"
-down_revision = None
-description = "create users"
+@pytest.fixture()
+def ignite_client():
+    """Raw pyignite Client connected to the test cluster."""
+    client = Client()
+    client.connect([(IGNITE_HOST, IGNITE_PORT)])
+    yield client
+    client.close()
 
 
-def upgrade():
-    op.execute_sql(
-        "CREATE TABLE users (id INT, PRIMARY KEY (id))"
+@pytest.fixture()
+def clean_version_table(ignite_client):
+    """Drop the test version table before and after each test."""
+    _drop_table(ignite_client, TEST_VERSION_TABLE)
+    yield
+    _drop_table(ignite_client, TEST_VERSION_TABLE)
+
+
+def _drop_table(client: Client, table: str) -> None:
+    cursor = client.sql(
+        f"DROP TABLE IF EXISTS {table}",
+        schema=TEST_SCHEMA,
     )
+    list(cursor)
 
 
-def downgrade():
-    op.execute_sql("DROP TABLE IF EXISTS users")
-"""
-    )
+def write_migration_file(
+    versions_dir: str,
+    revision: str,
+    down_revision: str | None,
+    description: str = "",
+    upgrade_body: str = "pass",
+    downgrade_body: str = "pass",
+) -> str:
+    """Write a migration .py file to the versions directory and return its path."""
+    slug = description.lower().replace(" ", "_")[:30] or "migration"
+    filename = f"{revision}_{slug}.py"
+    filepath = os.path.join(versions_dir, filename)
 
-    (versions_dir / "bbb444555666_add_email.py").write_text(
-        """\
-from pyignite_migrate.operations import op
+    down_rev_repr = repr(down_revision)
+    content = textwrap.dedent(f"""\
+        from pyignite_migrate.operations import op
 
-revision = "bbb444555666"
-down_revision = "aaa111222333"
-description = "add email"
+        revision = {revision!r}
+        down_revision = {down_rev_repr}
+        description = {description!r}
 
+        def upgrade():
+            {upgrade_body}
 
-def upgrade():
-    op.execute_sql(
-        "ALTER TABLE users ADD COLUMN email VARCHAR(255)"
-    )
-
-
-def downgrade():
-    op.execute_sql(
-        "ALTER TABLE users DROP COLUMN email"
-    )
-"""
-    )
-
-    return tmp_project
+        def downgrade():
+            {downgrade_body}
+    """)
+    with open(filepath, "w") as f:
+        f.write(content)
+    return filepath

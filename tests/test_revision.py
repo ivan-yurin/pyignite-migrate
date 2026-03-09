@@ -5,160 +5,107 @@ from pyignite_migrate.revision import Revision, RevisionMap
 
 
 class TestRevision:
-    def test_is_base(self):
-        rev = Revision("aaa", None)
-        assert rev.is_base is True
-
-    def test_is_not_base(self):
-        rev = Revision("bbb", "aaa")
-        assert rev.is_base is False
-
-    def test_is_head_by_default(self):
-        rev = Revision("aaa", None)
-        assert rev.is_head is True
-
     def test_repr(self):
-        rev = Revision("aaa", "bbb")
-        assert "aaa" in repr(rev)
-        assert "bbb" in repr(rev)
+        rev = Revision("0001", None)
+
+        assert repr(rev) == "<Revision '0001' -> None>"
 
 
 class TestRevisionMap:
-    def test_empty(self):
-        rev_map = RevisionMap([])
-        assert rev_map.is_empty() is True
-        assert rev_map.get_heads() == []
-        assert rev_map.get_bases() == []
+    def test_duplicate_revision_id(self):
+        revisions = [
+            Revision("0001", None),
+            Revision("0001", None),
+        ]
 
-    def test_single_revision(self):
-        r1 = Revision("aaa", None, "first")
-        rev_map = RevisionMap([r1])
-        assert rev_map.get_heads() == ["aaa"]
-        assert rev_map.get_bases() == ["aaa"]
+        with pytest.raises(RevisionError, match="Duplicate revision ID"):
+            RevisionMap(revisions)
 
-    def test_linear_chain(self):
-        r1 = Revision("aaa", None, "first")
-        r2 = Revision("bbb", "aaa", "second")
-        r3 = Revision("ccc", "bbb", "third")
-        rev_map = RevisionMap([r1, r2, r3])
-        assert rev_map.get_heads() == ["ccc"]
-        assert rev_map.get_bases() == ["aaa"]
+    def test_unknown_down_revision(self):
+        revisions = [
+            Revision("0001", "9999"),
+        ]
 
-    def test_duplicate_revision_raises(self):
-        r1 = Revision("aaa", None)
-        r2 = Revision("aaa", None)
-        with pytest.raises(RevisionError, match="Duplicate"):
-            RevisionMap([r1, r2])
-
-    def test_broken_reference_raises(self):
-        r1 = Revision("bbb", "missing")
-        with pytest.raises(RevisionError, match="unknown"):
-            RevisionMap([r1])
+        with pytest.raises(RevisionError, match="references unknown down_revision"):
+            RevisionMap(revisions)
 
     def test_cycle_detection(self):
-        r1 = Revision("aaa", "bbb")
-        r2 = Revision("bbb", "aaa")
-        with pytest.raises(RevisionError, match="Cycle"):
-            RevisionMap([r1, r2])
+        revisions = [
+            Revision("0001", "0002"),
+            Revision("0002", "0001"),
+        ]
 
-    def test_get_revision(self):
-        r1 = Revision("aaa", None, "first")
-        rev_map = RevisionMap([r1])
-        assert rev_map.get_revision("aaa").description == "first"
+        with pytest.raises(RevisionError, match="Cycle detected"):
+            RevisionMap(revisions)
 
     def test_get_revision_not_found(self):
-        rev_map = RevisionMap([])
-        with pytest.raises(RevisionError, match="not found"):
-            rev_map.get_revision("missing")
+        rev_map = RevisionMap([Revision("0001", None)])
 
-    def test_get_all_revisions_order(self):
-        r1 = Revision("aaa", None, "first")
-        r2 = Revision("bbb", "aaa", "second")
-        r3 = Revision("ccc", "bbb", "third")
-        rev_map = RevisionMap([r3, r1, r2])
-        all_revs = rev_map.get_all_revisions()
-        assert [r.revision for r in all_revs] == [
-            "aaa",
-            "bbb",
-            "ccc",
+        with pytest.raises(RevisionError, match="Revision not found"):
+            rev_map.get_revision("9999")
+
+    def test_check_revision_not_found(self):
+        rev_map = RevisionMap([Revision("0001", None)])
+
+        with pytest.raises(RevisionError, match="Revision not found"):
+            rev_map.check_revision("9999")
+
+    def test_upgrade_path_unknown_current(self):
+        rev_map = RevisionMap([Revision("0001", None)])
+
+        with pytest.raises(RevisionError, match="Current revision not found"):
+            rev_map.get_upgrade_path("9999", "0001")
+
+    def test_upgrade_path_unknown_target(self):
+        rev_map = RevisionMap([Revision("0001", None)])
+
+        with pytest.raises(RevisionError, match="Target revision not found"):
+            rev_map.get_upgrade_path(None, "9999")
+
+    def test_upgrade_path_target_not_ahead(self):
+        revisions = [
+            Revision("0001", None),
+            Revision("0002", "0001"),
         ]
+        rev_map = RevisionMap(revisions)
 
+        with pytest.raises(RevisionError, match="not ahead of current"):
+            rev_map.get_upgrade_path("0002", "0001")
 
-class TestUpgradePath:
-    def test_full_upgrade_from_base(self):
-        r1 = Revision("aaa", None)
-        r2 = Revision("bbb", "aaa")
-        r3 = Revision("ccc", "bbb")
-        rev_map = RevisionMap([r1, r2, r3])
-
-        path = rev_map.get_upgrade_path(None, "ccc")
-        assert [r.revision for r in path] == [
-            "aaa",
-            "bbb",
-            "ccc",
+    def test_upgrade_path_from_non_base(self):
+        revisions = [
+            Revision("0001", None),
+            Revision("0002", "0001"),
+            Revision("0003", "0002"),
         ]
+        rev_map = RevisionMap(revisions)
 
-    def test_partial_upgrade(self):
-        r1 = Revision("aaa", None)
-        r2 = Revision("bbb", "aaa")
-        r3 = Revision("ccc", "bbb")
-        rev_map = RevisionMap([r1, r2, r3])
+        path = rev_map.get_upgrade_path("0001", "0003")
 
-        path = rev_map.get_upgrade_path("aaa", "ccc")
-        assert [r.revision for r in path] == ["bbb", "ccc"]
+        assert [r.revision for r in path] == ["0002", "0003"]
 
-    def test_upgrade_single_step(self):
-        r1 = Revision("aaa", None)
-        r2 = Revision("bbb", "aaa")
-        rev_map = RevisionMap([r1, r2])
+    def test_downgrade_path_unknown_current(self):
+        rev_map = RevisionMap([Revision("0001", None)])
 
-        path = rev_map.get_upgrade_path("aaa", "bbb")
-        assert [r.revision for r in path] == ["bbb"]
+        with pytest.raises(RevisionError, match="Current revision not found"):
+            rev_map.get_downgrade_path("9999", None)
 
-    def test_target_not_ahead_raises(self):
-        r1 = Revision("aaa", None)
-        r2 = Revision("bbb", "aaa")
-        rev_map = RevisionMap([r1, r2])
-
-        with pytest.raises(RevisionError, match="not ahead"):
-            rev_map.get_upgrade_path("bbb", "aaa")
-
-
-class TestDowngradePath:
-    def test_full_downgrade_to_base(self):
-        r1 = Revision("aaa", None)
-        r2 = Revision("bbb", "aaa")
-        r3 = Revision("ccc", "bbb")
-        rev_map = RevisionMap([r1, r2, r3])
-
-        path = rev_map.get_downgrade_path("ccc", None)
-        assert [r.revision for r in path] == [
-            "ccc",
-            "bbb",
-            "aaa",
+    def test_downgrade_path_unknown_target(self):
+        revisions = [
+            Revision("0001", None),
+            Revision("0002", "0001"),
         ]
+        rev_map = RevisionMap(revisions)
 
-    def test_partial_downgrade(self):
-        r1 = Revision("aaa", None)
-        r2 = Revision("bbb", "aaa")
-        r3 = Revision("ccc", "bbb")
-        rev_map = RevisionMap([r1, r2, r3])
+        with pytest.raises(RevisionError, match="Target revision not found"):
+            rev_map.get_downgrade_path("0002", "9999")
 
-        path = rev_map.get_downgrade_path("ccc", "aaa")
-        assert [r.revision for r in path] == ["ccc", "bbb"]
+    def test_downgrade_path_target_not_behind(self):
+        revisions = [
+            Revision("0001", None),
+            Revision("0002", "0001"),
+        ]
+        rev_map = RevisionMap(revisions)
 
-    def test_downgrade_single_step(self):
-        r1 = Revision("aaa", None)
-        r2 = Revision("bbb", "aaa")
-        rev_map = RevisionMap([r1, r2])
-
-        path = rev_map.get_downgrade_path("bbb", "aaa")
-        assert [r.revision for r in path] == ["bbb"]
-
-    def test_target_not_behind_raises(self):
-        r1 = Revision("aaa", None)
-        r2 = Revision("bbb", "aaa")
-        rev_map = RevisionMap([r1, r2])
-
-        with pytest.raises(RevisionError, match="not behind"):
-            rev_map.get_downgrade_path("aaa", "bbb")
+        with pytest.raises(RevisionError, match="not behind current"):
+            rev_map.get_downgrade_path("0001", "0002")

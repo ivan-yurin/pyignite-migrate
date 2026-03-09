@@ -45,61 +45,18 @@ class RevisionMap:
         self._build_nextrev_links()
         self._validate()
 
-    def _build_nextrev_links(self) -> None:
-        children: dict[str, set[str]] = {rev_id: set() for rev_id in self._revisions}
-        for rev in self._revisions.values():
-            if rev.down_revision is not None and rev.down_revision in children:
-                children[rev.down_revision].add(rev.revision)
-
-        for rev_id, child_set in children.items():
-            self._revisions[rev_id].nextrev = frozenset(child_set)
-
-    def _validate(self) -> None:
-        for rev in self._revisions.values():
-            if (
-                rev.down_revision is not None
-                and rev.down_revision not in self._revisions
-            ):
-                raise RevisionError(
-                    f"Revision {rev.revision!r} references unknown "
-                    f"down_revision {rev.down_revision!r}"
-                )
-        self._topological_sort()
-
     def get_revision(self, rev_id: str) -> Revision:
         if rev_id not in self._revisions:
             raise RevisionError(f"Revision not found: {rev_id!r}")
         return self._revisions[rev_id]
 
+    def check_revision(self, rev_id: str) -> None:
+        """Raise RevisionError if the revision does not exist."""
+        if rev_id not in self._revisions:
+            raise RevisionError(f"Revision not found: {rev_id!r}")
+
     def get_heads(self) -> list[str]:
         return sorted(rev.revision for rev in self._revisions.values() if rev.is_head)
-
-    def get_bases(self) -> list[str]:
-        return sorted(rev.revision for rev in self._revisions.values() if rev.is_base)
-
-    def _topological_sort(self) -> list[str]:
-        in_degree: dict[str, int] = {rev_id: 0 for rev_id in self._revisions}
-        for rev in self._revisions.values():
-            if rev.down_revision is not None:
-                in_degree[rev.revision] += 1
-
-        queue = sorted(rev_id for rev_id, deg in in_degree.items() if deg == 0)
-        result = []
-
-        while queue:
-            current = queue.pop(0)
-            result.append(current)
-            rev = self._revisions[current]
-            for child_id in sorted(rev.nextrev):
-                in_degree[child_id] -= 1
-                if in_degree[child_id] == 0:
-                    queue.append(child_id)
-            queue.sort()
-
-        if len(result) != len(self._revisions):
-            raise RevisionError("Cycle detected in revision graph")
-
-        return result
 
     def get_upgrade_path(
         self,
@@ -169,6 +126,58 @@ class RevisionMap:
             if rev_id in ancestors
         ]
 
+    def get_all_revisions(self) -> list[Revision]:
+        topo = self._topological_sort()
+        return [self._revisions[rev_id] for rev_id in topo]
+
+    def is_empty(self) -> bool:
+        return len(self._revisions) == 0
+
+    def _build_nextrev_links(self) -> None:
+        children: dict[str, set[str]] = {rev_id: set() for rev_id in self._revisions}
+        for rev in self._revisions.values():
+            if rev.down_revision is not None and rev.down_revision in children:
+                children[rev.down_revision].add(rev.revision)
+
+        for rev_id, child_set in children.items():
+            self._revisions[rev_id].nextrev = frozenset(child_set)
+
+    def _validate(self) -> None:
+        for rev in self._revisions.values():
+            if (
+                rev.down_revision is not None
+                and rev.down_revision not in self._revisions
+            ):
+                raise RevisionError(
+                    f"Revision {rev.revision!r} references unknown "
+                    f"down_revision {rev.down_revision!r}"
+                )
+        self._topological_sort()
+
+    def _topological_sort(self) -> list[str]:
+        in_degree: dict[str, int] = {rev_id: 0 for rev_id in self._revisions}
+        for rev in self._revisions.values():
+            if rev.down_revision is not None:
+                in_degree[rev.revision] += 1
+
+        queue = sorted(rev_id for rev_id, deg in in_degree.items() if deg == 0)
+        result = []
+
+        while queue:
+            current = queue.pop(0)
+            result.append(current)
+            rev = self._revisions[current]
+            for child_id in sorted(rev.nextrev):
+                in_degree[child_id] -= 1
+                if in_degree[child_id] == 0:
+                    queue.append(child_id)
+            queue.sort()
+
+        if len(result) != len(self._revisions):
+            raise RevisionError("Cycle detected in revision graph")
+
+        return result
+
     def _get_ancestors(self, rev_id: str) -> set[str]:
         result: set[str] = set()
         current = self._revisions[rev_id].down_revision
@@ -176,10 +185,3 @@ class RevisionMap:
             result.add(current)
             current = self._revisions[current].down_revision
         return result
-
-    def get_all_revisions(self) -> list[Revision]:
-        topo = self._topological_sort()
-        return [self._revisions[rev_id] for rev_id in topo]
-
-    def is_empty(self) -> bool:
-        return len(self._revisions) == 0

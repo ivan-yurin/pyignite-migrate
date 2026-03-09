@@ -41,8 +41,15 @@ jobs:
       - name: Mypy
         run: uv run mypy pyignite_migrate/
 
+      - name: Start Ignite for integration tests
+        run: docker compose up -d --wait ignite
+
       - name: Tests
         run: uv run pytest tests/ -v
+
+      - name: Stop Ignite
+        if: always()
+        run: docker compose down
 
   build:
     name: Build distributions

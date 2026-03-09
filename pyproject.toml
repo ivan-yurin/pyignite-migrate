@@ -58,6 +58,7 @@ dev = [
     "coverage>=7.13",
     "ruff>=0.15",
     "mypy>=1.19",
+    "pytest-cov>=7.0.0",
 ]
 
 [build-system]

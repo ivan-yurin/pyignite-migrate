@@ -1,0 +1,12 @@
+services:
+  ignite:
+    image: apacheignite/ignite:2.16.0
+    platform: linux/amd64
+    ports:
+      - "10800:10800"
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/ignite/apache-ignite/bin/control.sh --baseline || exit 1"]
+      interval: 5s
+      timeout: 10s
+      retries: 20
+      start_period: 30s

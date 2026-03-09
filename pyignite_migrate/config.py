@@ -55,6 +55,11 @@ class Config:
             config_dir=config_dir,
         )
 
+    def get_script_location_abs(self) -> str:
+        if os.path.isabs(self.script_location):
+            return self.script_location
+        return os.path.join(self.config_dir, self.script_location)
+
     @staticmethod
     def _parse_hosts(hosts_raw: str) -> list[tuple[str, int]]:
         result = []
@@ -80,8 +85,3 @@ class Config:
                     f"Cannot find {DEFAULT_CONFIG_FILENAME} in any parent directory"
                 )
             current = parent
-
-    def get_script_location_abs(self) -> str:
-        if os.path.isabs(self.script_location):
-            return self.script_location
-        return os.path.join(self.config_dir, self.script_location)
