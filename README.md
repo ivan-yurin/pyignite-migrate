@@ -131,6 +131,7 @@ version_table = __pyignite_migrate_version
 ## Requirements
 
 - Python >= 3.10
+- CI checks run on Python 3.10, 3.11, 3.12, 3.13, and 3.14
 - Apache Ignite with thin client protocol
 
 ## Development
