@@ -1,9 +1,6 @@
 import os
 
-import pytest
-
 from pyignite_migrate.config import Config
-from pyignite_migrate.errors import ScriptError
 from pyignite_migrate.script import ScriptDirectory
 
 
@@ -37,7 +34,7 @@ class TestScriptDirectory:
         )
         sd = ScriptDirectory(config)
         rev_id = sd.generate_revision("create users table")
-        assert len(rev_id) == 12
+        assert rev_id == "0001"
 
         versions_dir = tmp_project / "migrations" / "versions"
         files = [
@@ -48,6 +45,20 @@ class TestScriptDirectory:
         assert len(files) == 1
         assert files[0].startswith(rev_id)
         assert "create_users_table" in files[0]
+
+    def test_generate_revision_sequential_numbers(
+        self, tmp_project
+    ):
+        config = Config.from_file(
+            str(tmp_project / "pyignite_migrate.ini")
+        )
+        sd = ScriptDirectory(config)
+
+        first = sd.generate_revision("first")
+        second = sd.generate_revision("second")
+
+        assert first == "0001"
+        assert second == "0002"
 
     def test_generate_revision_chained(
         self, sample_migration_files
@@ -60,6 +71,7 @@ class TestScriptDirectory:
         )
         sd = ScriptDirectory(config)
         rev_id = sd.generate_revision("add phone column")
+        assert rev_id == "0001"
 
         rev_map = sd.get_revision_map()
         rev = rev_map.get_revision(rev_id)

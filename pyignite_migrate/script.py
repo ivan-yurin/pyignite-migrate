@@ -1,7 +1,6 @@
 import importlib.util
 import os
 import re
-import uuid
 from datetime import datetime, timezone
 from typing import Optional, List
 
@@ -35,6 +34,35 @@ class ScriptDirectory:
 
     def invalidate(self) -> None:
         self._revision_map = None
+
+    def _next_revision_id(self, rev_map: RevisionMap) -> str:
+        existing_ids = {
+            rev.revision for rev in rev_map.get_all_revisions()
+        }
+        numeric_ids = [
+            int(rev_id)
+            for rev_id in existing_ids
+            if rev_id.isdigit()
+        ]
+
+        next_id = max(numeric_ids, default=0) + 1
+        if next_id > 9999:
+            raise ScriptError(
+                "Cannot generate revision ID: maximum 4-digit "
+                "revision number (9999) reached"
+            )
+
+        next_rev_id = f"{next_id:04d}"
+        while next_rev_id in existing_ids:
+            next_id += 1
+            if next_id > 9999:
+                raise ScriptError(
+                    "Cannot generate revision ID: maximum 4-digit "
+                    "revision number (9999) reached"
+                )
+            next_rev_id = f"{next_id:04d}"
+
+        return next_rev_id
 
     def _load_revisions(self) -> List[Revision]:
         if not os.path.isdir(self.versions_dir):
@@ -102,12 +130,12 @@ class ScriptDirectory:
         message: str,
         head: Optional[str] = None,
     ) -> str:
-        rev_id = uuid.uuid4().hex[:12]
+        rev_map = self.get_revision_map()
+        rev_id = self._next_revision_id(rev_map)
 
         if head is not None:
             down_revision = head
         else:
-            rev_map = self.get_revision_map()
             if rev_map.is_empty():
                 down_revision = None
             else:

@@ -48,7 +48,7 @@ Edit the generated file in `migrations/versions/`:
 ```python
 from pyignite_migrate.operations import op
 
-revision = 'a1b2c3d4e5f6'
+revision = '0001'
 down_revision = None
 description = 'create users table'
 
