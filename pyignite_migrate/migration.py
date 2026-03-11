@@ -137,8 +137,7 @@ class MigrationContext:
 
     def _clear_current_revision(self) -> None:
         cursor = self._get_client().sql(
-            f"DELETE FROM {self.config.version_table}",
-            schema=self.config.schema
+            f"DELETE FROM {self.config.version_table}", schema=self.config.schema
         )
         list(cursor)
 

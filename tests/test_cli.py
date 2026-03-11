@@ -92,7 +92,7 @@ class TestRevision:
         assert result.output == "Generated new revision: 0001\n"
 
         files = os.listdir(cli_env.versions_dir)
-        assert files == ['0001_migration.py']
+        assert files == ["0001_migration.py"]
 
     def test_generates_sequential_revision(self, runner, cli_env):
         _invoke(runner, cli_env, ["revision"])
@@ -103,7 +103,7 @@ class TestRevision:
         assert result.output == "Generated new revision: 0002\n"
 
         files = sorted(f for f in os.listdir(cli_env.versions_dir) if f.endswith(".py"))
-        assert files == ['0001_migration.py', '0002_migration.py']
+        assert files == ["0001_migration.py", "0002_migration.py"]
 
     def test_generates_revision_with_message(self, runner, cli_env):
         result = _invoke(runner, cli_env, ["revision", "-m", "create users table"])
@@ -112,7 +112,7 @@ class TestRevision:
         assert result.output == "Generated new revision: 0001\n"
 
         files = os.listdir(cli_env.versions_dir)
-        assert files == ['0001_create_users_table.py']
+        assert files == ["0001_create_users_table.py"]
 
 
 @requires_ignite
@@ -134,9 +134,9 @@ class TestUpgrade:
         result = _invoke(runner, cli_env, ["upgrade"])
 
         assert result.exit_code == 0
-        assert result.output == ("Applied 2 migration(s):\n"
-                                 "  -> 0001: first\n"
-                                 "  -> 0002: second\n")
+        assert result.output == (
+            "Applied 2 migration(s):\n  -> 0001: first\n  -> 0002: second\n"
+        )
 
     def test_upgrade_to_specific_target(self, runner, cli_env):
         write_migration_file(
@@ -161,9 +161,9 @@ class TestUpgrade:
         result = _invoke(runner, cli_env, ["upgrade", "0002"])
 
         assert result.exit_code == 0
-        assert result.output == ("Applied 2 migration(s):\n"
-                                 "  -> 0001: first\n"
-                                 "  -> 0002: second\n")
+        assert result.output == (
+            "Applied 2 migration(s):\n  -> 0001: first\n  -> 0002: second\n"
+        )
 
     def test_upgrade_noop(self, runner, cli_env):
         write_migration_file(
@@ -212,7 +212,7 @@ class TestUpgrade:
         assert result.exit_code == 0
 
         cursor = ignite_client.sql(
-            f"SELECT * FROM __test_cli_upgrade",
+            "SELECT * FROM __test_cli_upgrade",
             schema=TEST_SCHEMA,
             include_field_names=True,
         )
@@ -220,10 +220,11 @@ class TestUpgrade:
         assert rows[0] == ["ID", "VAL"]
 
         # Cleanup
-        list(ignite_client.sql(
-            f"DROP TABLE IF EXISTS __test_cli_upgrade",
+        sql = ignite_client.sql(
+            "DROP TABLE IF EXISTS __test_cli_upgrade",
             schema=TEST_SCHEMA,
-        ))
+        )
+        list(sql)
 
 
 @requires_ignite
@@ -246,9 +247,9 @@ class TestDowngrade:
         result = _invoke(runner, cli_env, ["downgrade", "base"])
 
         assert result.exit_code == 0
-        assert result.output == ("Reverted 2 migration(s):\n"
-                                 "  <- 0002: second\n"
-                                 "  <- 0001: first\n")
+        assert result.output == (
+            "Reverted 2 migration(s):\n  <- 0002: second\n  <- 0001: first\n"
+        )
 
     def test_downgrade_single_step(self, runner, cli_env):
         write_migration_file(
@@ -268,8 +269,7 @@ class TestDowngrade:
         result = _invoke(runner, cli_env, ["downgrade", "--", "-1"])
 
         assert result.exit_code == 0
-        assert result.output == ("Reverted 1 migration(s):\n"
-                                 "  <- 0002: second\n")
+        assert result.output == "Reverted 1 migration(s):\n  <- 0002: second\n"
 
     def test_downgrade_to_specific_revision(self, runner, cli_env):
         write_migration_file(
@@ -295,9 +295,9 @@ class TestDowngrade:
         result = _invoke(runner, cli_env, ["downgrade", "0001"])
 
         assert result.exit_code == 0
-        assert result.output == ("Reverted 2 migration(s):\n"
-                                 "  <- 0003: third\n"
-                                 "  <- 0002: second\n")
+        assert result.output == (
+            "Reverted 2 migration(s):\n  <- 0003: third\n  <- 0002: second\n"
+        )
 
     def test_downgrade_when_at_base(self, runner, cli_env):
         result = _invoke(runner, cli_env, ["downgrade", "base"])
@@ -332,8 +332,7 @@ class TestCurrent:
         result = _invoke(runner, cli_env, ["current"])
 
         assert result.exit_code == 0
-        assert result.output == ("Current revision: 0001\n"
-                                 "  Description: first\n")
+        assert result.output == "Current revision: 0001\n  Description: first\n"
 
     def test_current_at_head(self, runner, cli_env):
         write_migration_file(
@@ -347,8 +346,7 @@ class TestCurrent:
         result = _invoke(runner, cli_env, ["current"])
 
         assert result.exit_code == 0
-        assert result.output == ("Current revision: 0001 (head)\n"
-                                 "  Description: only\n")
+        assert result.output == "Current revision: 0001 (head)\n  Description: only\n"
 
 
 @requires_ignite
@@ -377,8 +375,10 @@ class TestHistory:
         result = _invoke(runner, cli_env, ["history"])
 
         assert result.exit_code == 0
-        assert result.output == ("0001 -> (base) (base): create users\n"
-                                 "0002 -> 0001 (head, current): add index\n")
+        assert result.output == (
+            "0001 -> (base) (base): create users\n"
+            "0002 -> 0001 (head, current): add index\n"
+        )
 
 
 @requires_ignite
@@ -400,8 +400,7 @@ class TestHeads:
         result = _invoke(runner, cli_env, ["heads"])
 
         assert result.exit_code == 0
-        assert result.output == ("Head revision(s) (1):\n"
-                                 "  0001: first migration\n")
+        assert result.output == "Head revision(s) (1):\n  0001: first migration\n"
 
 
 @requires_ignite
